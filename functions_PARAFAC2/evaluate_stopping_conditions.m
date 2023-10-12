@@ -1,7 +1,7 @@
-function [stop] = evaluate_stopping_conditions(f_tensors,f_couplings,f_constraints,f_tensors_old,f_couplings_old,f_constraints_old,options)
+function [stop] = evaluate_stopping_conditions(f_tensors,f_PAR2_couplings,f_constraints,f_tensors_old,f_PAR2_couplings_old,f_constraints_old,options)
 % wether or not to stop
 stop_tensors = false;
-stop_couplings = false;
+stop_PAR2_couplings = false;
 stop_constraints = false;
 
 if f_tensors_old>0
@@ -13,13 +13,13 @@ if f_tensors < options.AbsFuncTol || f_tensors_rel_change < options.OuterRelTol
     stop_tensors = true;
 end
 
-if f_couplings_old>0
-    f_couplings_rel_change = abs(f_couplings_old-f_couplings)/f_couplings_old;
+if f_PAR2_couplings_old>0
+    f_couplings_rel_change = abs(f_PAR2_couplings_old-f_PAR2_couplings)/f_PAR2_couplings_old;
 else
-    f_couplings_rel_change = abs(f_couplings_old-f_couplings);
+    f_couplings_rel_change = abs(f_PAR2_couplings_old-f_PAR2_couplings);
 end
-if f_couplings < options.AbsFuncTol || f_couplings_rel_change < options.OuterRelTol
-    stop_couplings = true;
+if f_PAR2_couplings < options.AbsFuncTol || f_couplings_rel_change < options.OuterRelTol
+    stop_PAR2_couplings = true;
 end
 
 if f_constraints_old>0
@@ -31,7 +31,7 @@ if f_constraints < options.AbsFuncTol || f_constraints_rel_change < options.Oute
     stop_constraints = true;
 end
 
-stop = stop_tensors & stop_couplings & stop_constraints;
+stop = stop_tensors & stop_PAR2_couplings & stop_constraints;
 
 
 end

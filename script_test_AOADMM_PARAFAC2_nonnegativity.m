@@ -16,17 +16,15 @@ sz_A = 20; %I
 sz_C = 20; %K
 sz_B = 30*ones(1,sz_C); %J_k
 R = 3; %number of components
-%noise_stddev = 1e-4; %level of noise, for gaussian noise only!
+
 noise_level = 0.2;
 
 K = sz_C;
 
 A = randn(sz_A,R);
 A(A<0) = 0;
-%A = rand(sz_A,R);
 C = rand(sz_C,R)+0.1;
 B{1} = randn(sz_B(1),R);
-%B{1} = rand(sz_B(1),R);
 B{1}(B{1}<0) = 0;
 for r=1:R %normalize columnwise
     A(:,r) = A(:,r)/norm(A(:,r),2);
@@ -40,7 +38,6 @@ end
 %construct tensor slices
 for k=1:K
     X{k} = A*diag(C(k,:))*B{k}';
-    %X{k} = X{k} + noise_stddev.*randn(size(X{k})); %add noise
 end
 % add noise 
 for k=1:K
@@ -77,8 +74,7 @@ prox_operators = cell(3,1); % cell array of length number of modes (3) containin
 
 prox_operators{1} = @(x,rho) project_box(x,0,inf); % non-negativity
 prox_operators{2} = @(x,rho) project_box(x,0,inf); % non-negativity
-prox_operators{3} = @(x,rho) project_box(x,0,inf); % non-negativity (for now I suppose the prox operator for mode C is given in a column-wise format, which is then applied to the rows instead)
-
+prox_operators{3} = @(x,rho) project_box(x,0,inf); % non-negativity
 
 Z.size  = {sz_A,sz_B,sz_C};
 Z.constrained_modes = constrained_modes;

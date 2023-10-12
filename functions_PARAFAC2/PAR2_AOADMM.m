@@ -7,14 +7,45 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
     
     R = Z.R;
     K = Z.size{3};
+    BtB = cell(K,1);
+    
+    Z.normsqr = 0;
     for k=1:K
-        Z.normsqr(k) = norm(Z.object{k},'fro')^2; % precompute squared norms
+        Z.normsqr = Z.normsqr + norm(Z.object{k},'fro')^2; % precompute squared norms
         BtB{k} = G.B{k}'*G.B{k};
-    end   
+    end 
+    
+    XC = cell(K,1);
+    YC = cell(K,1);
+    LC = cell(K,1);
+    rhoC = zeros(K,1);
+    YB = cell(K,1);
+    XB = cell(K,1);
+    LB = cell(K,1);
+    rhoB = zeros(K,1);
+    
+    % update mode A once before the algorithm starts
+    XA = zeros(size(G.A));
+    YA = zeros(R,R);
+    for k=1:K
+        XA = XA + Z.object{k}*G.B{k}*diag(G.C(k,:));
+        YA = YA + diag(G.C(k,:))*BtB{k}*diag(G.C(k,:));
+    end 
+    if isfield(Z,'optional_ridge_penalties')
+        YA = YA + Z.optional_ridge_penalties(1)*eye(R,R);
+    end
+    if Z.constrained_modes(1) % is constrained, use ADMM
+        rhoA = trace(YA)/R;
+        YA = YA + rhoA/2*eye(R,R);
+        LA = chol(YA','lower'); %precompute Cholesky decomposition
+        [~] = ADMM_A(XA,LA,rhoA,options);
+    else % ALS update
+        G.A = XA/YA;
+    end
 
     out.innerIters = zeros(3,1);
 
-    [f_tensors,f_couplings,f_constraints] = PAR2_AOADMM_func_eval;
+    [f_tensors,f_couplings,f_constraints] = PAR2_AOADMM_func_eval(0,[],[]);
     f_total = f_tensors+f_couplings+f_constraints;
     func_val(1) = f_tensors;
     func_coupl(1) = f_couplings;
@@ -35,26 +66,7 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
     stop = false;
     while(iter<=options.MaxOuterIters && ~stop)
     
-       % update mode A
-       XA = zeros(size(G.A));
-       YA = zeros(R,R);
-       for k=1:K
-           XA = XA + Z.object{k}*G.B{k}*diag(G.C(k,:));
-           YA = YA + diag(G.C(k,:))*BtB{k}*diag(G.C(k,:));
-       end 
-       if isfield(Z,'optional_ridge_penalties')
-           YA = YA + Z.optional_ridge_penalties(1)*eye(R,R);
-       end
-       if Z.constrained_modes(1) % is constrained, use ADMM
-           rhoA = trace(YA)/R;
-           YA = YA + rhoA/2*eye(R,R);
-           LA = chol(YA','lower'); %precompute Cholesky decomposition
-           [inner_iters] = ADMM_A(XA,LA,rhoA,options);
-       else % ALS update
-           G.A = XA/YA;
-           inner_iters = 1;
-       end
-       out.innerIters(1,iter)= inner_iters;
+       % precompute A^T*A
        AtA = G.A'*G.A;
        
        % update mode B
@@ -99,12 +111,34 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
            [inner_iters] = ADMM_C(XC,LC,rhoC,options);
        end
        out.innerIters(3,iter)= inner_iters;
+       
+       % update mode A
+       XA = zeros(size(G.A));
+       YA = zeros(R,R);
+       for k=1:K
+           XA = XA + Z.object{k}*G.B{k}*diag(G.C(k,:));
+           YA = YA + diag(G.C(k,:))*BtB{k}*diag(G.C(k,:));
+       end 
+       YA_orig = YA;
+       if isfield(Z,'optional_ridge_penalties')
+           YA = YA + Z.optional_ridge_penalties(1)*eye(R,R);
+       end
+       if Z.constrained_modes(1) % is constrained, use ADMM
+           rhoA = trace(YA)/R;
+           YA = YA + rhoA/2*eye(R,R);
+           LA = chol(YA','lower'); %precompute Cholesky decomposition
+           [inner_iters] = ADMM_A(XA,LA,rhoA,options);
+       else % ALS update
+           G.A = XA/YA;
+           inner_iters = 1;
+       end
+       out.innerIters(1,iter)= inner_iters;
         
        % evaluate function value
        f_tensors_old = f_tensors;
        f_couplings_old = f_couplings;
        f_constraints_old = f_constraints;
-       [f_tensors,f_couplings,f_constraints] = PAR2_AOADMM_func_eval;
+       [f_tensors,f_couplings,f_constraints] = PAR2_AOADMM_func_eval(iter,XA,YA_orig);
 
        f_total = f_tensors+f_couplings+f_constraints;
        func_val(iter+1) = f_tensors;
@@ -138,23 +172,38 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
     end
     
     %% nested functions
-    function [f_tensors,f_couplings,f_constraints] = PAR2_AOADMM_func_eval()
+     function [f_tensors,f_PAR2_couplings,f_constraints] = PAR2_AOADMM_func_eval(iter,XA,YA)
         f_tensors = 0;
-        f_couplings = 0;
+        f_PAR2_couplings = 0;
         f_constraints = 0;
+        if iter > 0
+            f_tensors = Z.normsqr - 2*sum(XA.*G.A,'all') + sum((G.A'*G.A).*YA,'all');
+        end
         for kk=1:K
-            f_tensors = f_tensors + norm(Z.object{kk}-G.A*diag(G.C(kk,:))*G.B{kk}','fro')^2/Z.normsqr(kk);
-            f_couplings = f_couplings + norm(G.B{kk}-G.P{kk}*G.DeltaB,'fro')/norm(G.B{kk},'fro');
+            if iter == 0
+                f_tensors = f_tensors + norm(Z.object{kk}-G.A*diag(G.C(kk,:))*G.B{kk}','fro')^2;
+            end
+            f_PAR2_couplings = f_PAR2_couplings + norm(G.B{kk}-G.P{kk}*G.DeltaB,'fro')/norm(G.B{kk},'fro');
             if Z.constrained_modes(2)
                 f_constraints = f_constraints + norm(G.B{kk}-G.ZB{kk},'fro')/norm(G.B{kk},'fro');
             end
         end
+        f_tensors = f_tensors./Z.normsqr;
+        f_PAR2_couplings = f_PAR2_couplings/K;
+        if Z.constrained_modes(2)
+            f_constraints = f_constraints/K;
+        end
+        
         if Z.constrained_modes(1)
             f_constraints = f_constraints + norm(G.A-G.ZA,'fro')/norm(G.A,'fro');
         end
         if Z.constrained_modes(3)
             f_constraints = f_constraints + norm(G.C-G.ZC,'fro')/norm(G.C,'fro');
-        end 
+        end
+        if any(Z.constrained_modes)
+            f_constraints = f_constraints/sum(Z.constrained_modes);
+        end
+        
     end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     function [inner_iter] = ADMM_A(X,L,rho,options)
@@ -197,10 +246,9 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
                 X_inner = X{kk} + rho(kk)/2*(G.ZC(kk,:)' - G.mu_C(kk,:)');
 
                 G.C(kk,:) = (L{kk}'\(L{kk}\X_inner))'; % forward-backward substitution
-                G.ZC(kk,:) = (feval(Z.prox_operators{3},(G.C(kk,:) + G.mu_C(kk,:)),rho(kk)));
             end
                 % Update constraint factor (Z_C) and its dual (mu_Z_C)
-                %G.ZC = (feval(Z.prox_operators{3},(G.C + G.mu_C)',rho))'; % suppossing the prox is given in column-wise format
+                G.ZC = (feval(Z.prox_operators{3},(G.C + G.mu_C),max(rho)));
                 G.mu_C = G.mu_C + G.C - G.ZC;
 
                 inner_iter = inner_iter + 1; 
@@ -220,6 +268,7 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
         rel_dual_res_constr = inf;
         rel_primal_res_coupling = inf;
         rel_dual_res_coupling = inf;
+        oldP = cell(K,1);
         % ADMM loop
         while (inner_iter<=options.MaxInnerIters &&(rel_primal_res_coupling>options.innerRelPrTol_coupl||rel_primal_res_constr>options.innerRelPrTol_constr||rel_dual_res_coupling>options.innerRelDualTol_coupl||rel_dual_res_constr>options.innerRelDualTol_constr))
             rel_primal_res_constr = 0;
