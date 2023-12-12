@@ -206,15 +206,7 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
         
         if isfield(Z,'reg_func')
             if ~isempty(Z.reg_func{1})
-                f_tensors = f_tensors + feval(Z.reg_func{1},G.A);
-            end
-            if ~isempty(Z.reg_func{3})
-                f_tensors = f_tensors + feval(Z.reg_func{3},G.C);
-            end
-            if ~isempty(Z.reg_func{2})
-                for kk=1:K
-                    f_tensors = f_tensors + feval(Z.reg_func{2},G.B{kk});
-                end
+                f_tensors = f_tensors + feval(Z.reg_func{1},G.fac{n});
             end
         end
         

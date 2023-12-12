@@ -75,14 +75,16 @@ prox_operators = cell(3,1); % cell array of length number of modes (3) containin
 prox_operators{1} = @(x,rho) project_box(x,0,inf); % non-negativity
 prox_operators{2} = @(x,rho) project_box(x,0,inf); % non-negativity
 prox_operators{3} = @(x,rho) project_box(x,0,inf); % non-negativity
-
+%% set regularization functions for each mode (corresponding to proximal operator for that mode) that should be included in the function value computation (optional)
+% Z.reg_func = cell(3,1); % cell array of length number of modes containing the function handles of regularization functions for each mode, empty if no regularization; function should operate on the whole matrix
+% Z.reg_func{1} =  @(x)
+%% add optional ridge regularization performed via primal variable updates, not proximal operators (for no ridge leave field empty), will automatically be added to function value computation
+%Z.optional_ridge_penalties = [1e-3,1e-3,1e-3]; % penalties for modes [A,Bk,C]
+%%
 Z.size  = {sz_A,sz_B,sz_C};
 Z.constrained_modes = constrained_modes;
 Z.prox_operators = prox_operators;
 Z.R = R;
-
-%% add optional ridge regularization performed via primal variable updates, not proximal operators (for no ridge leave field empty)
-%Z.optional_ridge_penalties = [1e-3,1e-3,1e-3]; % penalties for modes [A,Bk,C]
 %% Create random initialization
 init.A = rand(sz_A,R);
 init.C = rand(sz_C,R);
