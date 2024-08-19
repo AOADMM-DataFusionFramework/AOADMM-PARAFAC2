@@ -2,6 +2,10 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
 %UNTITLED Summary of this function goes here
 %   Detailed explanation goes here
 
+    if ~isfield(options,'iter_start_PAR2Bkconstraint')
+        options.iter_start_Bkconstraint = 0;
+    end
+
     FacInit = init;
     G = init;
     
@@ -74,12 +78,18 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
            XB{k} = Z.object{k}'*G.A*diag(G.C(k,:));
            YB{k} = diag(G.C(k,:))*AtA*diag(G.C(k,:));    
            rhoB(k) = trace(YB{k})/R;
+           if isfield(options, 'increase_factor_rhoBk')
+               rhoB(k) = options.increase_factor_rhoBk * rhoB(k);
+           end
            YB{k} = YB{k} + rhoB(k)/2*eye(R,R); %always coupled 
            if Z.constrained_modes(2)
                YB{k} = YB{k} + rhoB(k)/2*eye(R,R);
            end
            if isfield(Z,'optional_ridge_penalties')
                YB{k} = YB{k} + Z.optional_ridge_penalties(2)*eye(R,R);
+           end
+           if Z.constrained_modes(2) && iter >= options.iter_start_Bkconstraint
+               YB{k} = YB{k} + rhoB(k)/2*eye(size(YB{k}));
            end
            LB{k} = chol(YB{k},'lower'); %precompute Cholesky decomposition 
        end
@@ -300,7 +310,7 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
             rel_dual_res_coupling = 0;
             for kk=1:K
                 X_inner = X{kk} + rho(kk)/2*(G.P{kk}*G.DeltaB - G.mu_DeltaB{kk});
-                if Z.constrained_modes(2)
+                if Z.constrained_modes(2) && iter >= options.iter_start_Bkconstraint
                     X_inner = X_inner + rho(kk)/2*(G.ZB{kk} - G.mu_B_Z{kk});
                 end
                 G.B{kk} = (X_inner/L{kk}')/L{kk}; % forward-backward substitution
@@ -324,7 +334,7 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
             
             % Update constraint factor (Z_B) and its dual (mu_Z_B) if
             % constrained
-            if Z.constrained_modes(2)
+            if Z.constrained_modes(2) && iter >= options.iter_start_Bkconstraint
                 oldZ = G.ZB;
                 for kk=1:K
                     G.ZB{kk} = feval(Z.prox_operators{2},(G.B{kk} + G.mu_B_Z{kk}),rho(kk));

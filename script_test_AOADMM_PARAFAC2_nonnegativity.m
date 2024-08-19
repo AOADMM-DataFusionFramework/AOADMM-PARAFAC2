@@ -116,7 +116,7 @@ if constrained_modes(2)
         init.mu_B_Z{k} = rand(sz_B(k),R);
     end
 end
-%% Fit using AOADMM  
+%% set options 
 
 options.Display ='iter'; %  set to 'iter' or 'final' or 'no'
 options.DisplayIters = 100;
@@ -128,6 +128,11 @@ options.innerRelPrTol_coupl = 1e-3;
 options.innerRelPrTol_constr = 1e-3;
 options.innerRelDualTol_coupl = 1e-3;
 options.innerRelDualTol_constr = 1e-3;
+
+%% set additional (optional) options for diificult constraints/regularizations on mode Bk of PARAFAC2
+%options.iter_start_Bkconstraint = 100; % set the number of iterations after which the constraint on Bk will be active 
+%options.increase_factor_rhoBk = 10; % set the factor by which the automatically selected value of rho_Bk is increased
+%% fit the model
 
 fprintf('AOADMM PARAFAC2 \n')
 tic
