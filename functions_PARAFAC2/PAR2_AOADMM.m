@@ -8,6 +8,11 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
 
     FacInit = init;
     G = init;
+
+    % Constraints
+    [prox_operators,reg_func] = constraints_to_prox(Z.constrained_modes,Z.constraints,Z.size);
+    Z.prox_operators = prox_operators;
+    Z.reg_func = reg_func;
     
     R = Z.R;
     K = Z.size{3};
