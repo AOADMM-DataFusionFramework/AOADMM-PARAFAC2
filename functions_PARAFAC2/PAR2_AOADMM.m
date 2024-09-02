@@ -40,8 +40,8 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
         XA = XA + Z.object{k}*G.B{k}*diag(G.C(k,:));
         YA = YA + diag(G.C(k,:))*BtB{k}*diag(G.C(k,:));
     end 
-    if isfield(Z,'optional_ridge_penalties')
-        YA = YA + Z.optional_ridge_penalties(1)*eye(R,R);
+    if isfield(Z,'ridge')
+        YA = YA + Z.ridge(1)*eye(R,R);
     end
     if Z.constrained_modes(1) % is constrained, use ADMM
         rhoA = trace(YA)/R;
@@ -87,8 +87,8 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
                rhoB(k) = options.increase_factor_rhoBk * rhoB(k);
            end
            YB{k} = YB{k} + rhoB(k)/2*eye(R,R); %always coupled 
-           if isfield(Z,'optional_ridge_penalties')
-               YB{k} = YB{k} + Z.optional_ridge_penalties(2)*eye(R,R);
+           if isfield(Z,'ridge')
+               YB{k} = YB{k} + Z.ridge(2)*eye(R,R);
            end
            if Z.constrained_modes(2) && iter >= options.iter_start_Bkconstraint
                YB{k} = YB{k} + rhoB(k)/2*eye(size(YB{k}));
@@ -107,8 +107,8 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
        for k=1:K   
            XC{k} = diag(G.A'*Z.object{k}*G.B{k});
            YC{k} = AtA.*(BtB{k});
-           if isfield(Z,'optional_ridge_penalties')
-               YC{k} = YC{k} + Z.optional_ridge_penalties(3)*eye(R,R);
+           if isfield(Z,'ridge')
+               YC{k} = YC{k} + Z.ridge(3)*eye(R,R);
            end
            if Z.constrained_modes(3) % is constrained, use ADMM (here only precomputations)
                rhoC(k) = trace(YC{k})/R;
@@ -132,8 +132,8 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
            YA = YA + diag(G.C(k,:))*BtB{k}*diag(G.C(k,:));
        end 
        YA_orig = YA;
-       if isfield(Z,'optional_ridge_penalties')
-           YA = YA + Z.optional_ridge_penalties(1)*eye(R,R);
+       if isfield(Z,'ridge')
+           YA = YA + Z.ridge(1)*eye(R,R);
        end
        if Z.constrained_modes(1) % is constrained, use ADMM
            rhoA = trace(YA)/R;
@@ -224,8 +224,12 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
                 f_tensors = f_tensors + feval(Z.reg_func{3},G.C);
             end
             if ~isempty(Z.reg_func{2})
-                for kk=1:K
-                    f_tensors = f_tensors + feval(Z.reg_func{2},G.B{kk});
+                if strcmp(Z.constraints{2}{1},'tPARAFAC2')
+                    f_tensors = f_tensors + feval(Z.reg_func{2},G.B);
+                else
+                    for kk=1:K
+                        f_tensors = f_tensors + feval(Z.reg_func{2},G.B{kk});
+                    end
                 end
             end
         end
@@ -333,19 +337,31 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
             for kk=1:K
                 G.mu_DeltaB{kk} = G.mu_DeltaB{kk} + G.B{kk} - G.P{kk}*G.DeltaB;
             end
-            
+
+
             % Update constraint factor (Z_B) and its dual (mu_Z_B) if
             % constrained
             if Z.constrained_modes(2) && iter >= options.iter_start_Bkconstraint
                 oldZ = G.ZB;
-                for kk=1:K
-                    G.ZB{kk} = feval(Z.prox_operators{2},(G.B{kk} + G.mu_B_Z{kk}),rho(kk));
-                    G.mu_B_Z{kk} = G.mu_B_Z{kk} + G.B{kk} - G.ZB{kk};             
-                    % sum up residuals
-                    rel_primal_res_constr = rel_primal_res_constr + norm(G.B{kk} - G.ZB{kk},'fro')/norm(G.B{kk},'fro')/K;
-                    rel_dual_res_constr = rel_dual_res_constr + norm(oldZ{kk} - G.ZB{kk},'fro')/norm(G.mu_B_Z{kk},'fro')/K;
+
+                if strcmp(Z.constraints{2}{1},'tPARAFAC2')
+                    G.ZB = feval(Z.prox_operators{2},cellfun(@(x, y) x + y, G.B, G.mu_B_Z, 'UniformOutput', false),rho);
+                    for kk=1:K
+                        G.mu_B_Z{kk} = G.mu_B_Z{kk} + G.B{kk} - G.ZB{kk};
+                        rel_primal_res_constr = rel_primal_res_constr + norm(G.B{kk} - G.ZB{kk},'fro')/norm(G.B{kk},'fro')/K;
+                        rel_dual_res_constr = rel_dual_res_constr + norm(oldZ{kk} - G.ZB{kk},'fro')/norm(G.mu_B_Z{kk},'fro')/K;
+                    end
+                else
+                    for kk=1:K
+                        G.ZB{kk} = feval(Z.prox_operators{2},(G.B{kk} + G.mu_B_Z{kk}),rho(kk));
+                        G.mu_B_Z{kk} = G.mu_B_Z{kk} + G.B{kk} - G.ZB{kk};             
+                        % sum up residuals
+                        rel_primal_res_constr = rel_primal_res_constr + norm(G.B{kk} - G.ZB{kk},'fro')/norm(G.B{kk},'fro')/K;
+                        rel_dual_res_constr = rel_dual_res_constr + norm(oldZ{kk} - G.ZB{kk},'fro')/norm(G.mu_B_Z{kk},'fro')/K;
+                    end
                 end
             end
+
             
             for kk=1:K
                 rel_primal_res_coupling = rel_primal_res_coupling + norm(G.B{kk} - G.P{kk}*G.DeltaB,'fro')/norm(G.B{kk},'fro')/K;
