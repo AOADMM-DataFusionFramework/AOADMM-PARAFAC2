@@ -12,7 +12,7 @@ set(0,'DefaultAxesFontSize',22)
 set(0,'DefaultLineLineWidth',4)
 set(0,'DefaultTextFontSize',22)
 set(0,'DefaultLineMarkerSize',2) %Marker size
-%% create PARAFAC2 data (here Shift PARAFAC)
+%% load PARAFAC2 data 
 
 A = load("gnd_factors.mat", "A").A;
 B_double = load("gnd_factors.mat", "B").B;
