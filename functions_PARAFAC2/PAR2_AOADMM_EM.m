@@ -1,6 +1,8 @@
 function [G,FacInit,out] = PAR2_AOADMM_EM(Z,options,init)
-%UNTITLED Summary of this function goes here
-%   Detailed explanation goes here
+% Computes the PARAFAC2 model of Z.object with missing entries, which are indicated in Z.miss.
+% Applies an Expectation-Maximization (EM) approach in order to estimate the missing entries. 
+% The final factors in G are normalized such that factor matrices A and Bk are normalized columnwise and the scaling is moved to factor matrix C
+
 
     if ~isfield(options,'iter_start_PAR2Bkconstraint')
         options.iter_start_Bkconstraint = 0;
@@ -199,6 +201,18 @@ function [G,FacInit,out] = PAR2_AOADMM_EM(Z,options,init)
     out.func_constr_conv = func_constr;
     out.time_at_it = time_at_it;
     out.func_rel_missing = func_rel_missing;
+
+    % normalize columns of A and B and put norms into C
+    for r=1:R
+        normAr = norm(G.A(:,r),2);
+        G.A(:,r) = G.A(:,r)/normAr;
+        G.C(:,r) = G.C(:,r).*normAr;
+        for k=1:K
+            normBrk = norm(G.B{k}(:,r),2);
+            G.B{k}(:,r) = G.B{k}(:,r)/normBrk;
+            G.C(k,r) = G.C(k,r).*normBrk;   
+        end
+    end
 
     %display final
     if strcmp(options.Display,'iter') || strcmp(options.Display,'final')

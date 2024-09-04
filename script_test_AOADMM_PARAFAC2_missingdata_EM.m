@@ -119,7 +119,7 @@ end
 
 options.Display ='iter'; %  set to 'iter' or 'final' or 'no'
 options.DisplayIters = 100;
-options.MaxOuterIters = 2000;
+options.MaxOuterIters = 4000;
 options.MaxInnerIters = 5;
 options.AbsFuncTol   = 1e-7;
 options.OuterRelTol = 1e-8;
@@ -139,8 +139,7 @@ tic
 toc
 
 %% FMS, normalization and permutation
-% in normSol, factor matrices A and Bk are normalized columnwise, the
-% scaling is moved to factor matrix C, all factors are permute to best
+% in normSol, all factors are permute to best
 % match the original factors
 [FMS_A,normSol.A,FLAG_A,PERM_A] = score(ktensor(ones(R,1),FacSol.A),ktensor(ones(R,1),A),'lambda_penalty',false);
 normSol.A = normSol.A.U{1};
@@ -156,12 +155,6 @@ end
 [FMS_B,~] = score(ktensor(ones(R,1),SollargeB),ktensor(ones(R,1),largeB),'lambda_penalty',false);
 
 normSol.C = FacSol.C;
-for r=1:R
-    normSol.C(:,r) = normSol.C(:,r).*norm(FacSol.A(:,r),2); %move the norm scaling to C
-    for k=1:K
-        normSol.C(k,r) = normSol.C(k,r)*norm(FacSol.B{k}(:,r),2);
-    end
-end
 normSol.C = normSol.C(:,PERM_A); %permute columns
 [FMS_C,~] = score(ktensor(ones(R,1),FacSol.C),ktensor(ones(R,1),C),'lambda_penalty',false); %FMS
 %% plot factors
