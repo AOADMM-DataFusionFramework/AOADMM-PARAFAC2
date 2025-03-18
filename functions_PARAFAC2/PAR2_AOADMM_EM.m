@@ -203,14 +203,18 @@ function [G,FacInit,out] = PAR2_AOADMM_EM(Z,options,init)
     out.func_rel_missing = func_rel_missing;
 
     % normalize columns of A and B and put norms into C
-    for r=1:R
+     for r=1:R
         normAr = norm(G.A(:,r),2);
-        G.A(:,r) = G.A(:,r)/normAr;
-        G.C(:,r) = G.C(:,r).*normAr;
+        if normAr > 0
+            G.A(:,r) = G.A(:,r)/normAr;
+            G.C(:,r) = G.C(:,r).*normAr;
+        end
         for k=1:K
             normBrk = norm(G.B{k}(:,r),2);
-            G.B{k}(:,r) = G.B{k}(:,r)/normBrk;
-            G.C(k,r) = G.C(k,r).*normBrk;   
+            if normBrk > 0
+                G.B{k}(:,r) = G.B{k}(:,r)/normBrk;
+                G.C(k,r) = G.C(k,r).*normBrk; 
+            end
         end
     end
 
