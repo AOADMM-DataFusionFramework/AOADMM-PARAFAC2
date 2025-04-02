@@ -178,21 +178,6 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
     out.func_constr_conv = func_constr;
     out.time_at_it = time_at_it;
 
-    % normalize columns of A and B and put norms into C
-    for r=1:R
-        normAr = norm(G.A(:,r),2);
-        if normAr > 0
-            G.A(:,r) = G.A(:,r)/normAr;
-            G.C(:,r) = G.C(:,r).*normAr;
-        end
-        for k=1:K
-            normBrk = norm(G.B{k}(:,r),2);
-            if normBrk > 0
-                G.B{k}(:,r) = G.B{k}(:,r)/normBrk;
-                G.C(k,r) = G.C(k,r).*normBrk; 
-            end
-        end
-    end
 
     %display final
     if strcmp(options.Display,'iter') || strcmp(options.Display,'final')
