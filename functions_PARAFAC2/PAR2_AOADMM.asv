@@ -248,9 +248,6 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
             if iter == 0 && ~has_missing
                 f_tensors = f_tensors + norm(Z.object{kk}-G.A*diag(G.C(kk,:))*G.B{kk}','fro')^2;
             end
-            if has_missing
-                f_tensors = f_tensors + norm(Z.miss{kk}.*(Z.object{kk}-G.A*diag(G.C(kk,:))*G.B{kk}'),'fro')^2;
-            end
             f_PAR2_couplings = f_PAR2_couplings + norm(G.B{kk}-G.P{kk}*G.DeltaB,'fro')/norm(G.B{kk},'fro');
             if Z.constrained_modes(2)
                 f_constraints = f_constraints + norm(G.B{kk}-G.ZB{kk},'fro')/norm(G.B{kk},'fro');

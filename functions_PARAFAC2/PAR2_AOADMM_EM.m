@@ -57,7 +57,7 @@ function [G,FacInit,out] = PAR2_AOADMM_EM(Z,options,init)
     out.innerIters = zeros(3,1);
 
     [f_tensors,f_couplings,f_constraints] = PAR2_AOADMM_func_eval();
-    f_rel_missing = 0;
+    f_rel_missing = NaN;
     f_total = f_tensors+f_couplings+f_constraints;
     func_val(1) = f_tensors;
     func_coupl(1) = f_couplings;
