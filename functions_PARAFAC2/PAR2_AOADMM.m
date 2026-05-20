@@ -3,6 +3,10 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
 % normalized such that factor matrices A and Bk are normalized columnwise and the scaling is moved to factor matrix C
 
     has_missing = isfield(Z, 'miss') && any(~cellfun(@isempty, Z.miss));
+    if has_missing
+        Zmiss_struct = check_missing(Z.miss,Z.size);
+        Z.miss = Zmiss_struct;
+    end
 
     if ~isfield(options,'iter_start_PAR2Bkconstraint')
         options.iter_start_Bkconstraint = 0;
