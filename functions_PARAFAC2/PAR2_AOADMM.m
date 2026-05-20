@@ -2,6 +2,12 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
 % computes the PARAFAC2 model of Z.object. The final factors in G are
 % normalized such that factor matrices A and Bk are normalized columnwise and the scaling is moved to factor matrix C
 
+    has_missing = isfield(Z, 'miss') && any(~cellfun(@isempty, Z.miss));
+    if has_missing
+        Zmiss_struct = check_missing(Z.miss,Z.size);
+        Z.miss = Zmiss_struct;
+    end
+
     if ~isfield(options,'iter_start_PAR2Bkconstraint')
         options.iter_start_Bkconstraint = 0;
     end
@@ -19,10 +25,17 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
     BtB = cell(K,1);
     
     Z.normsqr = 0;
-    for k=1:K
-        Z.normsqr = Z.normsqr + norm(Z.object{k},'fro')^2; % precompute squared norms
-        BtB{k} = G.B{k}'*G.B{k};
-    end 
+    if has_missing
+        for k=1:K
+            Z.normsqr = Z.normsqr + norm(Z.miss{k}.*Z.object{k},'fro')^2; % precompute squared norms (with zeros at missing entries)
+            BtB{k} = G.B{k}'*G.B{k};
+        end 
+    else
+        for k=1:K
+            Z.normsqr = Z.normsqr + norm(Z.object{k},'fro')^2; % precompute squared norms
+            BtB{k} = G.B{k}'*G.B{k};
+        end 
+    end
     
     XC = cell(K,1);
     YC = cell(K,1);
@@ -54,21 +67,32 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
 
     out.innerIters = zeros(3,1);
 
-    [f_tensors,f_couplings,f_constraints] = PAR2_AOADMM_func_eval(0,[],[]);
+    [f_tensors,f_couplings,f_constraints] = PAR2_AOADMM_func_eval(0,[],[],has_missing);
+    f_rel_missing = NaN;
     f_total = f_tensors+f_couplings+f_constraints;
     func_val(1) = f_tensors;
     func_coupl(1) = f_couplings;
     func_constr(1) = f_constraints;
+    func_rel_missing(1) = f_rel_missing;
     tstart = tic;
     time_at_it(1) = 0;
     %display first iteration
     if strcmp(options.Display,'iter') || strcmp(options.Display,'final')
-        fprintf(1,' Iter  f total      f tensors      f couplings    f constraints   \n');
-        fprintf(1,'------ ------------ -------------  -------------- ----------------\n');
+        if has_missing
+             fprintf(1,' Iter  f total      f tensors      f couplings    f constraints    f rel missing\n');
+             fprintf(1,'------ ------------ -------------  -------------- ---------------- -------------\n');
+        else
+            fprintf(1,' Iter  f total      f tensors      f couplings    f constraints   \n');
+            fprintf(1,'------ ------------ -------------  -------------- ----------------\n');
+        end
     end
 
     if strcmp(options.Display,'iter')
-        fprintf(1,'%6d %12f %12f %12f %12f\n', 0, f_total, f_tensors, f_couplings,f_constraints);
+        if has_missing
+            fprintf(1,'%6d %12f %12f %12f %12f %12f\n', 0, f_total, f_tensors, f_couplings,f_constraints,f_rel_missing);
+        else
+            fprintf(1,'%6d %12f %12f %12f %12f\n', 0, f_total, f_tensors, f_couplings,f_constraints);
+        end
     end
     iter = 1;
     
@@ -145,23 +169,50 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
            inner_iters = 1;
        end
        out.innerIters(1,iter)= inner_iters;
+
+       if has_missing
+           % update missing values
+           diff_missing = 0;
+           norm_missing = 0;
+           for k=1:K 
+               Z_object_tempk = G.A*diag(G.C(k,:))*G.B{k}';
+               old_missingk = Z.object{k}(~Z.miss{k});
+               new_missingk = Z_object_tempk(~Z.miss{k});
+               Z.object{k}(~Z.miss{k})= new_missingk;
+               diff_missing = diff_missing + norm(old_missingk - new_missingk,2)^2;
+               norm_missing = norm_missing + norm(old_missingk,2)^2;
+           end 
+           if norm_missing > 0
+               f_rel_missing = sqrt(diff_missing)/sqrt(norm_missing);
+           else
+               f_rel_missing = sqrt(diff_missing);
+           end
+       end
         
        % evaluate function value
        f_tensors_old = f_tensors;
        f_couplings_old = f_couplings;
        f_constraints_old = f_constraints;
-       [f_tensors,f_couplings,f_constraints] = PAR2_AOADMM_func_eval(iter,XA,YA_orig);
+       [f_tensors,f_couplings,f_constraints] = PAR2_AOADMM_func_eval(iter,XA,YA_orig,has_missing);
 
        f_total = f_tensors+f_couplings+f_constraints;
        func_val(iter+1) = f_tensors;
        func_coupl(iter+1) = f_couplings;
        func_constr(iter+1) = f_constraints;
        time_at_it(iter+1) = toc(tstart);
+       func_rel_missing(iter+1) = f_rel_missing;
        stop = evaluate_stopping_conditions(f_tensors,f_couplings,f_constraints,f_tensors_old,f_couplings_old,f_constraints_old,options);
+       if has_missing
+           stop = stop && (f_rel_missing < options.OuterRelTol);
+       end
 
         %display
         if strcmp(options.Display,'iter') && mod(iter,options.DisplayIters)==0
-            fprintf(1,'%6d %12f %12f %12f %12f\n', iter, f_total, f_tensors, f_couplings,f_constraints);
+            if has_missing
+                fprintf(1,'%6d %12f %12f %12f %12f %12f\n', iter, f_total, f_tensors, f_couplings,f_constraints,f_rel_missing);
+            else
+                fprintf(1,'%6d %12f %12f %12f %12f\n', iter, f_total, f_tensors, f_couplings,f_constraints);
+            end
         end
         iter = iter+1;
     end
@@ -177,30 +228,39 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
     out.func_coupl_conv = func_coupl;
     out.func_constr_conv = func_constr;
     out.time_at_it = time_at_it;
+    out.func_rel_missing = func_rel_missing;
 
 
     %display final
     if strcmp(options.Display,'iter') || strcmp(options.Display,'final')
-        fprintf(1,'%6d %12f %12f %12f %12f\n', iter-1, f_total, f_tensors, f_couplings,f_constraints);
+        if has_missing
+            fprintf(1,'%6d %12f %12f %12f %12f %12f\n', iter-1, f_total, f_tensors, f_couplings,f_constraints,f_rel_missing);
+        else
+            fprintf(1,'%6d %12f %12f %12f %12f\n', iter-1, f_total, f_tensors, f_couplings,f_constraints);
+        end
     end
     
     %% nested functions
-     function [f_tensors,f_PAR2_couplings,f_constraints] = PAR2_AOADMM_func_eval(iter,XA,YA)
+    function [f_tensors,f_PAR2_couplings,f_constraints] = PAR2_AOADMM_func_eval(iter,XA,YA,has_missing)
         f_tensors = 0;
         f_PAR2_couplings = 0;
         f_constraints = 0;
-        if iter > 0
+        if iter > 0 && ~has_missing
             f_tensors = Z.normsqr - 2*sum(XA.*G.A,'all') + sum((G.A'*G.A).*YA,'all');
         end
         for kk=1:K
-            if iter == 0
+            if iter == 0 && ~has_missing
                 f_tensors = f_tensors + norm(Z.object{kk}-G.A*diag(G.C(kk,:))*G.B{kk}','fro')^2;
+            end
+            if has_missing
+                f_tensors = f_tensors + norm(Z.miss{kk}.*(Z.object{kk}-G.A*diag(G.C(kk,:))*G.B{kk}'),'fro')^2;
             end
             f_PAR2_couplings = f_PAR2_couplings + norm(G.B{kk}-G.P{kk}*G.DeltaB,'fro')/norm(G.B{kk},'fro');
             if Z.constrained_modes(2)
                 f_constraints = f_constraints + norm(G.B{kk}-G.ZB{kk},'fro')/norm(G.B{kk},'fro');
             end
         end
+        
         f_tensors = f_tensors./Z.normsqr;
         f_PAR2_couplings = f_PAR2_couplings/K;
         if Z.constrained_modes(2)

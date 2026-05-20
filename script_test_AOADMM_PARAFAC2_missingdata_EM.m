@@ -52,16 +52,17 @@ end
 for k=1:K
     Z.object{k} = X{k};
 end
-%% specify missing entries (logical matrices, where 0 indicates a missing entry)
+%% Optional: specify missing entries (logical matrices, where 0 indicates a missing entry)
+%% If Z.miss does not exist or Z.miss{k} is empty for at least one k=1,...,K, the PAR2_AOADMM assumes that there are no missing entries und runs without EM-imputation
 load ('missing_mask.mat')
 for k=1:K
     Z.miss{k} = missing_mask{k};
 end
-%% impute missing entries
+%% impute missing entries with values of your choice
 for k=1:K
     Z.original_object{k} = Z.object{k};
     for j=1:size(Z.object{k},2)
-        Z.object{k}(~Z.miss{k}(:,j),j) = 0;%mean(Z.object{k}(Z.miss{k}(:,j),j)); % imput with column-mean
+        Z.object{k}(~Z.miss{k}(:,j),j) = 0;%mean(Z.object{k}(Z.miss{k}(:,j),j)); % impute with column-mean
     end
 end
 %% Parameters for AOADMM
@@ -135,7 +136,7 @@ options.innerRelDualTol_constr = 1e-5;
 
 fprintf('AOADMM PARAFAC2 \n')
 tic
-[FacSol,FacInit,out] = PAR2_AOADMM_EM(Z,options,init); 
+[FacSol,FacInit,out] = PAR2_AOADMM(Z,options,init); 
 toc
 
 %% FMS, normalization and permutation
