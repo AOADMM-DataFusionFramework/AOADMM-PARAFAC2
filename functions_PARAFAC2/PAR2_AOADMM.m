@@ -2,7 +2,7 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
 % computes the PARAFAC2 model of Z.object. The final factors in G are
 % normalized such that factor matrices A and Bk are normalized columnwise and the scaling is moved to factor matrix C
 
-    has_missing = isfield(Z, 'miss') && any(~cellfun(@isempty, Z.miss));
+    has_missing = isfield(Z,'miss');
     if has_missing
         Zmiss_struct = check_missing(Z.miss,Z.size);
         Z.miss = Zmiss_struct;
@@ -222,6 +222,7 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
     out.f_tensors = f_tensors;
     out.f_couplings = f_couplings;
     out.f_constraints = f_constraints;
+    out.f_rel_missing = f_rel_missing;
     out.exit_flag = exit_flag;
     out.OuterIterations = iter-1;
     out.func_val_conv = func_val;

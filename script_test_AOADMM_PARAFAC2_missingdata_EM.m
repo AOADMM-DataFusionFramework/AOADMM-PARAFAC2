@@ -12,6 +12,8 @@ set(0,'DefaultAxesFontSize',22)
 set(0,'DefaultLineLineWidth',4)
 set(0,'DefaultTextFontSize',22)
 set(0,'DefaultLineMarkerSize',2) %Marker size
+
+rng("default")
 %% create PARAFAC2 data (here Shift PARAFAC)
 sz_A = 20; %I
 sz_C = 20; %K
@@ -198,9 +200,11 @@ hold on
 semilogy([0:out.OuterIterations],out.func_coupl_conv,'--')
 hold on
 semilogy([0:out.OuterIterations],out.func_constr_conv,':')
+hold on
+semilogy([0:out.OuterIterations],out.func_rel_missing,'*')
 xlabel('iterations')
 ylabel('function value')
-legend('function value','difference coupling','difference constraints')
+legend('function value','difference coupling','difference constraints','difference missing')
 
 
 subplot(1,3,2)
@@ -209,9 +213,11 @@ hold on
 semilogy(out.time_at_it,out.func_coupl_conv,'--')
 hold on
 semilogy(out.time_at_it,out.func_constr_conv,':')
+hold on
+semilogy(out.time_at_it,out.func_rel_missing,'*')
 xlabel('time in seconds')
 ylabel('function value')
-legend('function value','difference coupling','difference constraints')
+legend('function value','difference coupling','difference constraints','difference missing')
 
 markers = {'+','o','*','x','^','v','s','d','>','<','p','h'};
 subplot(1,3,3)
