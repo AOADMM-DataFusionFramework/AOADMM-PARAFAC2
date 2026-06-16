@@ -176,7 +176,7 @@ for r=1:R
     subplot(1,R,r)
     plot(C(:,r))
     hold on
-    plot(normSol.C(:,r),'--')
+    plot(normSol.C(:,r)/norm(normSol.C(:,r),2),'--')
 end
 legend('true','estimated')
 sgtitle('factor matrix C','FontSize',30)

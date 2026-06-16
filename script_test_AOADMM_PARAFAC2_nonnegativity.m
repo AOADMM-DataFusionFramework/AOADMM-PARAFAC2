@@ -123,11 +123,6 @@ tic
 [FacSol,FacInit,out] = PAR2_AOADMM(Z,options,init); 
 toc
 
-%% correlations with true components
-fprintf('correlations with true components \n')
-corr(FacSol.A,A)
-corr(FacSol.C,C)
-corr(FacSol.B{1},B{1})
 %% FMS, normalization and permutation
 % in normSol, all factors are permute to best
 % match the original factors
@@ -163,7 +158,7 @@ for r=1:R
     subplot(1,R,r)
     plot(C(:,r))
     hold on
-    plot(normSol.C(:,r),'--')
+    plot(normSol.C(:,r)/norm(normSol.C(:,r),2),'--')
 end
 legend('true','estimated')
 sgtitle('factor matrix C','FontSize',30)
