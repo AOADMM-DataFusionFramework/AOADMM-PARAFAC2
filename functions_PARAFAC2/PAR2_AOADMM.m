@@ -2,6 +2,16 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
 % computes the PARAFAC2 model of Z.object. The final factors in G are
 % normalized such that factor matrices A and Bk are normalized columnwise and the scaling is moved to factor matrix C
 
+    R = Z.R;
+    K = Z.size{3};
+
+    % check rank and dimensions
+    for k=1:K
+        if Z.size{2}(k)<R
+            error('Number of components is larger than size of slice %d of data tensor.',k)
+        end
+    end
+
     has_missing = isfield(Z,'miss');
     if has_missing
         Zmiss_struct = check_missing(Z.miss,Z.size);
@@ -20,8 +30,6 @@ function [G,FacInit,out] = PAR2_AOADMM(Z,options,init)
     Z.prox_operators = prox_operators;
     Z.reg_func = reg_func;
     
-    R = Z.R;
-    K = Z.size{3};
     BtB = cell(K,1);
     
     Z.normsqr = 0;
